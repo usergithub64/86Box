@@ -184,7 +184,7 @@ client:
                     goto errmsg;
                 }
                 if (startup)
-                    ui_msgbox(MBX_ERROR | MBX_ANSI, msg);
+                    ui_msgbox(MBX_ERROR, msg);
                 else
                     char_pipe_log(dev->log, "%s\n", msg);
             }
@@ -211,7 +211,7 @@ client:
                 char_pipe_log(dev->log, "PTY open failed (%d)\n", err);
 
                 snprintf(msg, sizeof(msg), "%s: Could not connect to %s: %s", dev->port->name, dev->path_out, strerror(err));
-                ui_msgbox(MBX_ERROR | MBX_ANSI, msg);
+                ui_msgbox(MBX_ERROR, msg);
                 dev->path_out[dev->path_len] = prev;
                 goto errmsg;
             }
@@ -270,7 +270,7 @@ client:
             for (int j = 0; j <= 1; j++) {
                 snprintf(msg, sizeof(msg), (j == 0) ? "%s: Could not connect to %s: %s" : "%s: Could not create %s: %s", dev->port->name, path, strerror(err));
                 if (startup)
-                    ui_msgbox(MBX_ERROR | MBX_ANSI, msg);
+                    ui_msgbox(MBX_ERROR, msg);
                 else
                     char_pipe_log(dev->log, "%s\n", msg);
                 err = create_err;
@@ -291,7 +291,7 @@ errmsg:
     char_pipe_disconnect(dev, 0); /* just update status */
     if (msg[0]) {
         if (startup)
-            ui_msgbox(MBX_ERROR | MBX_ANSI, msg);
+            ui_msgbox(MBX_ERROR, msg);
         else
             char_pipe_log(dev->log, "%s\n", msg);
     }
@@ -392,14 +392,15 @@ char_pipe_status(void *priv)
 {
     char_pipe_t *dev = (char_pipe_t *) priv;
 
+    uint32_t ret = (dev->port->chardev.flags & (CHAR_LPT_NIBBLE | CHAR_LPT_PTI)) ? 0 : (CHAR_LPT_ERROR | CHAR_LPT_SELECT);
 #ifdef _WIN32
     if (!CHAR_FD_VALID(dev->fd) && !dev->block_connect)
         char_pipe_connect(dev, 0);
-    return CHAR_FD_VALID(dev->fd) ? (CHAR_COM_DSR | CHAR_COM_DCD | CHAR_COM_CTS) : CHAR_DISCONNECTED;
+    return CHAR_FD_VALID(dev->fd) ? (ret | CHAR_COM_DSR | CHAR_COM_DCD | CHAR_COM_CTS) : CHAR_DISCONNECTED;
 #else
     if ((!CHAR_FD_VALID(dev->fd_in) && !dev->block_connect_in) || (!CHAR_FD_VALID(dev->fd_out) && !dev->block_connect_out))
         char_pipe_connect(dev, 0);
-    return (CHAR_FD_VALID(dev->fd_in) ? (CHAR_COM_DSR | CHAR_COM_DCD) : CHAR_RX_DISCONNECTED) | (CHAR_FD_VALID(dev->fd_out) ? CHAR_COM_CTS : CHAR_TX_DISCONNECTED);
+    return (CHAR_FD_VALID(dev->fd_in) ? (ret | CHAR_COM_DSR | CHAR_COM_DCD) : CHAR_RX_DISCONNECTED) | (CHAR_FD_VALID(dev->fd_out) ? (ret | CHAR_COM_CTS) : CHAR_TX_DISCONNECTED);
 #endif
 }
 
@@ -489,7 +490,7 @@ static const device_config_t char_pipe_config[] = {
         .default_int  = 2,
         .selection    = {
             { .description = "Unidirectional (8-bit) / LapLink (4-bit)", .value = 0 },
-            //{ .description = "Bidirectional (8-bit)",                    .value = 1 },
+            { .description = "Bidirectional (8-bit)",                    .value = 1 },
             { .description = "DirectParallel FAST",                      .value = 2 },
             { NULL                                                                  }
         }
